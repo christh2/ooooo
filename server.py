@@ -1,30 +1,22 @@
-import socket
-import struct
-import pickle
+from flask import Flask, request
 import cv2
+import numpy as np
 
-def receive_image(host='127.0.0.1', port=8080):
-    # Crée un socket TCP/IP
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((host, port))
-    server_socket.listen(1)
-    print(f"Serveur en écoute sur {host}:{port}")
+app = Flask(__name__)
 
-    conn, addr = server_socket.accept()
-    with conn:
-        print('Connexion établie avec', addr)
-        while True:
-            # Reçoit la taille de l'image
-            data = conn.recv(1024)
-            if not data:
-                break
-            msg_size = struct.unpack("Q", data[:8])[0]
-            data = conn.recv(msg_size)
+@app.route('/upload', methods=['POST'])
+def upload_image():
+    if 'image' not in request.files:
+        return {'error': 'No image uploaded'}, 400
 
-            # Désérialise l'image
-            image = pickle.loads(data)
-            cv2.imwrite('received_image.jpg', image)
-            print("Image reçue et enregistrée sous 'received_image.jpg'")
+    image_file = request.files['image']
+    img_array = np.frombuffer(image_file.read(), np.uint8)
+    img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+    cv2.imwrite('received_image.jpg', img)
 
-if __name__ == "__main__":
-    receive_image()
+    return {'status': 'Image reçue avec succès'}, 200
+
+if __name__ == '__main__':
+    import os
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
